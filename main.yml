@@ -1,0 +1,51 @@
+- hosts: 127.0.0.1
+  connection: local
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: create container
+      docker:
+        name: tmp-oracle-api-gateway
+        image: "{{ base_image }}"
+        command: sleep infinity
+        volumes:
+          - "/opt/installers/oracle/fmw/11.1/api-gateway/11.1.2.3:/srv/files"
+        state: started
+        env:
+          JAVA_HOME: /usr/java/latest
+
+    - add_host:
+        name: tmp-oracle-api-gateway
+        groups: docker
+        ansible_connection: docker
+
+- hosts: tmp-oracle-api-gateway
+  connection: docker
+  vars:
+    oracle_api_gateway_installer: /srv/files/Linux/64bit/OAG_11.1.2.3.0-linux-x86-64-installer.run
+  pre_tasks:
+    - file:
+        path: /tmp
+        state: directory
+        mode: "u+rwx"
+  tasks:
+    - file:
+        path: "{{ oracle_api_gateway_installer }}"
+        mode: "u+x"
+    - command: "{{ oracle_api_gateway_installer }} --mode unattended --prefix /opt/oracle/api-gateway"
+
+- hosts: 127.0.0.1
+  connection: local
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: docker commit
+      command: "docker commit tmp-oracle-api-gateway tmp-oracle-api-gateway"
+
+    - name: docker kill
+      command: "docker kill tmp-oracle-api-gateway"
+
+    - name: docker rm
+      command: "docker rm tmp-oracle-api-gateway"
+
+- include: build.yml
